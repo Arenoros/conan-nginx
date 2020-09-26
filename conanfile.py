@@ -41,8 +41,9 @@ class NginxConan(ConanFile):
         out_dir = Path(self._install_dir).resolve()
         prefix = f'--prefix={out_dir}'
         crossbuild = f'--crossbuild={self.settings.os}::{self.settings.arch}'
-        cc = '--with-cc=$CC'
         
+        cc = '--with-cc=$CC' if tools.get_env("CC") else ''
+
         modules = ['--with-http_v2_module', '--with-http_ssl_module']
         if self.options.with_pcre:
             modules.append('--with-pcre')
