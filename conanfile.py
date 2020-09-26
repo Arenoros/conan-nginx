@@ -66,7 +66,7 @@ class NginxConan(ConanFile):
 
     def source(self):
         git = tools.Git(folder=self._source_dir)
-        git.clone("https://github.com/Arenoros/nginx.git", "test", shallow=True)
+        git.clone("https://github.com/Arenoros/nginx.git", "master", shallow=True)
 
     def build(self):
         self.output.info(os.getcwd())
@@ -75,10 +75,8 @@ class NginxConan(ConanFile):
         pass
 
     def package(self):
-        #raise "test"
         self.copy("*", src=self._install_dir, dst="nginx", keep_path=True)
-        #self.copy("license*", dst="", src=self.nasm_folder_name, keep_path=False, ignore_case=True)
-        
+    
 
-    def package_info(self):
-        self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
+    # def package_info(self):
+    #     self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
