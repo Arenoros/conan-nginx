@@ -21,27 +21,35 @@ class NginxConan(ConanFile):
     _source_dir = 'src_dir'
     _install_dir = 'out'
 
-#    build_requires = "tool_a/0.2@user/testing", "tool_b/0.2@user/testing"
     requires = "zlib/1.2.11", "openssl/1.1.1f"
 
     def build_requirements(self):
-        #self.build_requires("tool_win/0.1@user/stable")
         pass
 
     def requirements(self):
         if self.options.with_pcre:
             self.requires.add("pcre/[>=8.41]")
+        if self.settings.os == 'Android' and int(f'{self.settings.os.api_level}') < 28:
+            self.requires.add("ndk-libc-fix/[>=0.2]")
 
     def linux_build(self):
         lib_re = re.compile(r'(^-l|^-L)')
-        cc_re = re.compile(r'(^-Wl,-rpath=|^-L|^-l)')
+        cc_re = re.compile(r'(^-Wl,-rpath=|^-L|^-l)') #|^-std=|^-stdlib=
         params = self.all_flags.split()
+
         libs = ' '.join([flag for flag in params if lib_re.match(flag)])
+        if tools.get_env("LDFLAGS"):
+            libs = tools.get_env("LDFLAGS") + ' ' + libs
+
+
         cc_flags = ' '.join([flag for flag in params if not cc_re.match(flag)])
+        if tools.get_env("CFLAGS"):
+            cc_flags = tools.get_env("CFLAGS") + ' ' + cc_flags
+
         out_dir = Path(self._install_dir).resolve()
         prefix = f'--prefix={out_dir}'
         crossbuild = f'--crossbuild={self.settings.os}::{self.settings.arch}'
-        
+
         cc = '--with-cc=$CC' if tools.get_env("CC") else ''
 
         modules = ['--with-http_v2_module', '--with-http_ssl_module']
@@ -50,8 +58,10 @@ class NginxConan(ConanFile):
             custom_modules = '--add-module=modules/nginx-let-module'
         else:
             modules.append('--without-http_rewrite_module')
-
-        cc_flags=f'--with-cc-opt="{cc_flags} -pthread"'
+        if self.settings.os == 'Linux':
+            cc_flags += ' -pthread'
+        
+        cc_flags=f'--with-cc-opt="{cc_flags}"'
         ld_flags=f'--with-ld-opt="{libs}"'
         cmd = ' '.join([prefix, crossbuild, cc, custom_modules, ' '.join(modules), cc_flags, ld_flags])
         self.output.info(cmd)
@@ -61,9 +71,8 @@ class NginxConan(ConanFile):
             self.run('make install')
 
     def configure(self):
-
-        pass
-        
+        del self.settings.compiler.libcxx
+        del self.settings.compiler.cppstd   
 
     def source(self):
         git = tools.Git(folder=self._source_dir)
@@ -73,7 +82,6 @@ class NginxConan(ConanFile):
         self.output.info(os.getcwd())
         self.all_flags = tools.load("conanbuildinfo.args")
         self.linux_build()
-        pass
 
     def package(self):
         self.copy("*", src=self._install_dir, dst="nginx", keep_path=True)
