@@ -144,6 +144,8 @@ class NginxConan(ConanFile):
 
         if self.settings.os == 'Linux':
             self.ngx.add_cflags('-pthread')
+        if self.settings.os == 'Neutrino':
+            self.ngx.add_ldflags('-lsocket')
 
     def source(self):
         git = tools.Git(folder=self._source_dir)
