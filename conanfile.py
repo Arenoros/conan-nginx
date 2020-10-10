@@ -76,17 +76,21 @@ class NginxConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {
         "shared": [True, False],
-        "with_ssl": [True, False]
+        "with_ssl": [True, False],
+        "with_threads": [True, False],
+        "with_aio": [True, False]
     }
     default_options = {
         "shared": False,
-        "with_ssl": True
+        "with_ssl": True,
+        "with_threads": False,
+        "with_aio": False
     }
     generators = "compiler_args"
     _source_dir = 'src_dir'
     _prefix = 'out'
     exports_sources = ["0001-fix-win32-build.patch", "Makefile"]
-    requires = "zlib/1.2.11", "openssl/1.1.1f", 'pcre/[>=8.41]'
+    requires = "zlib/1.2.11", 'pcre/[>=8.41]'
 
     def build_requirements(self):
         if tools.os_info.is_windows and not tools.get_env("CONAN_BASH_PATH"):
@@ -95,6 +99,8 @@ class NginxConan(ConanFile):
     def requirements(self):
         if self.settings.os == 'Android' and int(f'{self.settings.os.api_level}') < 28:
             self.requires.add("ndk-libc-fix/[>=0.2]")
+        if self.options.with_ssl:
+            self.requires.add("openssl/1.1.1f")
 
     def linux_build(self):
         cmd = self.ngx.cmd()
@@ -120,14 +126,16 @@ class NginxConan(ConanFile):
     def configure(self):
         del self.settings.compiler.libcxx
         del self.settings.compiler.cppstd
-
+        
         cc = tools.get_env("CC")
         if not cc and platform.system() == 'Windows':
             cc = 'cl'
 
         self.ngx = NginxConfig(cc, self._prefix, f'{self.settings.os}::{self.settings.arch}')
-        #self.ngx.add_mod('threads')
-        self.ngx.add_mod('file-aio')
+        if self.options.with_threads:
+            self.ngx.add_mod('threads')
+        if self.options.with_aio:
+            self.ngx.add_mod('file-aio')
         self.ngx.add_mod('http_gunzip_module')
         self.ngx.custom_mod('modules/nginx-let-module')
         if self.options.with_ssl:
