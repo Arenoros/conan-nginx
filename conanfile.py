@@ -35,8 +35,10 @@ class NginxConfig():
 
     def set_args(self, args):
         link = re.compile(r'^(-l|-L|-link|/link|-LIBPATH|.*\.lib|.*\.so|.*\.a$)')
-        
+        skip = re.compile(r'^(-Wl,-rpath=)')
         for arg in args:
+            if skip.search(arg):
+                continue
             if link.search(arg):
                 self.add_ldflags(arg)
             else:
@@ -69,7 +71,7 @@ class NginxConfig():
 
 class NginxConan(ConanFile):
     name = "nginx"
-    version = "1.19.2"
+    #version = "1.19.2"
     license = "BSD-2-Clause"
     url = "https://github.com/arenoros/conan-nginx"
     description = "nginx server"
@@ -78,18 +80,20 @@ class NginxConan(ConanFile):
         "shared": [True, False],
         "with_ssl": [True, False],
         "with_threads": [True, False],
-        "with_aio": [True, False]
+        "with_aio": [True, False],
+        "without_libcrypt": [True, False]
     }
     default_options = {
         "shared": False,
         "with_ssl": True,
         "with_threads": False,
-        "with_aio": False
+        "with_aio": False,
+        "without_libcrypt": False
     }
     generators = "compiler_args"
     _source_dir = 'src_dir'
     _prefix = 'out'
-    exports_sources = ["0001-fix-win32-build.patch", "Makefile"]
+    #exports_sources = ["src_dir/*"]
     requires = "zlib/1.2.11", 'pcre/[>=8.41]'
 
     def build_requirements(self):
@@ -141,7 +145,8 @@ class NginxConan(ConanFile):
         if self.options.with_ssl:
             self.ngx.add_mod('http_v2_module')
             self.ngx.add_mod('http_ssl_module')
-
+        if self.options.without_libcrypt:
+            self.ngx.disable_mod('libcrypt')
         if self.settings.os == 'Linux':
             self.ngx.add_cflags('-pthread')
         if self.settings.os == 'Neutrino':
@@ -149,8 +154,8 @@ class NginxConan(ConanFile):
 
     def source(self):
         git = tools.Git(folder=self._source_dir)
-        git.clone("https://github.com/Arenoros/nginx.git", "master", shallow=True)
-
+        git.clone("https://github.com/Arenoros/nginx.git", self.version, shallow=True)
+        pass
     def build(self):
         self.output.info(os.getcwd())
 
