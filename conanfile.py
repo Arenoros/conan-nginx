@@ -1,10 +1,12 @@
-import os, re
+import os
+import re
 import platform
 from pathlib import Path
 from conans import ConanFile, CMake, tools, AutoToolsBuildEnvironment
 import json
 
 class NginxConfig():
+
     def __init__(self, cc, prefix, cross):
         self._cflags = []
         self._ldflags = []
@@ -18,7 +20,7 @@ class NginxConfig():
     def add_mod(self, *mods):
         for mod in mods:
             self._modules.append(f'--with-{mod}')
-    
+
     def disable_mod(self, *mods):
         for mod in mods:
             self._modules.append(f'--without-{mod}')
@@ -28,10 +30,10 @@ class NginxConfig():
             self._modules.append(f'--add-module={path}')
 
     def add_cflags(self, *opts):
-        self._cflags += opts
-    
+        self._cflags += [i for i in opts if type(i) == str]
+
     def add_ldflags(self, *opts):
-        self._ldflags += opts
+        self._ldflags += [i for i in opts if type(i) == str]
 
     def set_args(self, args):
         link = re.compile(r'^(-l|-L|-link|/link|-LIBPATH|.*\.lib|.*\.so|.*\.a$)')
@@ -43,7 +45,6 @@ class NginxConfig():
                 self.add_ldflags(arg)
             else:
                 self.add_cflags(arg)
-        
 
     @property
     def cflags(self):
@@ -91,9 +92,9 @@ class NginxConan(ConanFile):
         "without_libcrypt": False
     }
     generators = "compiler_args"
-    _source_dir = 'src_dir'
+    _source_dir = 'nginx'
     _prefix = 'out'
-    #exports_sources = ["src_dir/*"]
+    
     requires = "zlib/1.2.11", 'pcre/[>=8.41]'
 
     def build_requirements(self):
@@ -130,10 +131,13 @@ class NginxConan(ConanFile):
     def configure(self):
         del self.settings.compiler.libcxx
         del self.settings.compiler.cppstd
-        
+
         cc = tools.get_env("CC")
-        if not cc and platform.system() == 'Windows':
-            cc = 'cl'
+        if not cc:
+            if platform.system() == 'Windows':
+                cc = 'cl'
+            else:
+                cc = self.settings.compiler
 
         self.ngx = NginxConfig(cc, self._prefix, f'{self.settings.os}::{self.settings.arch}')
         if self.options.with_threads:
@@ -151,11 +155,14 @@ class NginxConan(ConanFile):
             self.ngx.add_cflags('-pthread')
         if self.settings.os == 'Neutrino':
             self.ngx.add_ldflags('-lsocket')
+        self.ngx.add_cflags(os.getenv('CFLAGS'))
+        self.ngx.add_ldflags(os.getenv('LDFLAGS'))
 
     def source(self):
         git = tools.Git(folder=self._source_dir)
         git.clone("https://github.com/Arenoros/nginx.git", self.version, shallow=True)
         pass
+
     def build(self):
         self.output.info(os.getcwd())
 
@@ -170,4 +177,3 @@ class NginxConan(ConanFile):
     def package(self):
         out_dir = Path(self._source_dir) / self._prefix
         self.copy("*", src=out_dir, dst="nginx", keep_path=True)
-    
